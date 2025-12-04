@@ -1,0 +1,1135 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>The Crossbow Legends: Twilight Trials</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Noto+Sans+TC:wght@400;700&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: radial-gradient(circle at center, #1a2a6c, #b21f1f, #fdbb2d); /* 活潑的暮光漸層背景 */
+            font-family: 'Cinzel', 'Noto Sans TC', serif;
+            color: #e0d0b0; /* 羊皮紙色 */
+            user-select: none;
+        }
+
+        #game-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        /* UI Layer */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        /* Crosshair */
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 40px;
+            height: 40px;
+            transform: translate(-50%, -50%);
+            border: 2px solid rgba(255, 200, 100, 0.8);
+            border-radius: 50%;
+            box-sizing: border-box;
+            transition: width 0.1s, height 0.1s;
+        }
+        #crosshair::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 4px;
+            height: 4px;
+            background: #ff4400;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+        }
+        .zoomed #crosshair {
+            width: 80px;
+            height: 80px;
+            border-color: #ff4400;
+            border-width: 1px;
+        }
+
+        /* HUD */
+        .hud-panel {
+            padding: 20px;
+            text-shadow: 0 0 10px rgba(255, 100, 0, 0.8);
+        }
+        
+        #top-bar {
+            display: flex;
+            justify-content: space-between;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+        }
+
+        .score-box { font-size: 24px; color: #ffcc00; }
+        .timer-box { font-size: 32px; font-weight: bold; color: #ff4444; }
+        .combo-box { 
+            font-size: 40px; 
+            font-weight: bold; 
+            color: #00ffff; 
+            opacity: 0; 
+            transition: opacity 0.2s;
+            text-shadow: 0 0 15px #00ffff;
+        }
+        .combo-active { opacity: 1; transform: scale(1.2); }
+
+        #bottom-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+        }
+
+        .ammo-display {
+            font-size: 20px;
+            text-align: right;
+        }
+        .ammo-type {
+            font-size: 16px;
+            color: #aaaaaa;
+        }
+        .ammo-selected {
+            color: #ffcc00;
+            font-weight: bold;
+            font-size: 22px;
+            text-shadow: 0 0 5px #ffcc00;
+        }
+
+        /* Menus */
+        .menu-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 5, 0, 0.8); /* 半透明背景，讓新的背景色透出來 */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            pointer-events: auto;
+            z-index: 10;
+        }
+
+        h1 {
+            font-size: 64px; /* 加大字體 */
+            margin-bottom: 10px;
+            background: -webkit-linear-gradient(#ffd700, #ff8c00); /* 更鮮豔的金色漸層 */
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-transform: uppercase;
+            letter-spacing: 8px; /* 增加字距 */
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.5); /* 增加發光效果 */
+        }
+
+        h2 { 
+            font-size: 32px; /* 加大字體 */
+            color: #e0d0b0; 
+            margin-bottom: 50px; 
+            letter-spacing: 4px; /* 增加字距 */
+        }
+
+        button {
+            background: transparent;
+            border: 3px solid #d4a017; /* 加粗邊框 */
+            color: #d4a017;
+            padding: 15px 50px; /* 增加內距 */
+            font-size: 24px; /* 加大字體 */
+            font-family: 'Cinzel', serif;
+            margin: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            position: relative;
+            overflow: hidden;
+            font-weight: bold; /* 加粗字體 */
+        }
+        
+        button::before {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%;
+            width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 215, 0, 0.4), transparent); /* 更亮的金色光暈 */
+            transition: 0.5s;
+        }
+
+        button:hover {
+            background: rgba(212, 160, 23, 0.3);
+            box-shadow: 0 0 25px #d4a017; /* 增強發光效果 */
+            color: #fff;
+            border-color: #ffd700; /* hover 時邊框變亮 */
+        }
+        button:hover::before { left: 100%; }
+
+        .hidden { display: none !important; }
+
+        /* Floating Text */
+        .floating-text {
+            position: absolute;
+            font-weight: bold;
+            pointer-events: none;
+            animation: floatUp 1s forwards;
+            text-shadow: 0 0 5px black;
+        }
+
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-50px) scale(1.5); }
+        }
+
+        #controls-hint {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            font-size: 14px;
+            color: #888;
+            text-align: left;
+            line-height: 1.5;
+        }
+        .key {
+            border: 1px solid #666;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: #222;
+            color: #eee;
+            font-family: monospace;
+        }
+
+        #flash {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: white;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 5;
+        }
+        
+        .hit-marker {
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 20px; height: 20px;
+            border: 2px solid red;
+            transform: translate(-50%, -50%) rotate(45deg);
+            opacity: 0;
+            transition: opacity 0.1s;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container"></div>
+<div id="flash"></div>
+
+<!-- Main Menu -->
+<div id="main-menu" class="menu-overlay">
+    <h1>The Crossbow Legends</h1>
+    <h2>Twilight Trials</h2>
+    <button onclick="Game.startMode('target')">🏹 模式一：精準射靶 (Target)</button>
+    <button onclick="Game.startMode('defense')">🛡️ 模式二：村莊防禦 (Defense)</button>
+    <button onclick="Game.startMode('patrol')">🌲 模式三：荒原巡邏 (Patrol)</button>
+    
+    <div style="margin-top: 30px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; text-align: left; border: 1px solid #444; padding: 20px; background: rgba(0,0,0,0.5);">
+        <div>
+            <p><span class="key">LMB</span> 射擊</p>
+            <p><span class="key">RMB</span> 精準瞄準 (Hold)</p>
+            <p><span class="key">MMB</span> 切換箭矢</p>
+            <p><span class="key">R</span> 裝填</p>
+        </div>
+        <div>
+            <p><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> 移動</p>
+            <p><span class="key">Shift</span> 靜步 / 穩定</p>
+            <p><span class="key">Q</span><span class="key">E</span> 閃避</p>
+            <p><span class="key">Space</span> 翻滾 / 跳躍</p>
+        </div>
+    </div>
+</div>
+
+<!-- Game Over / Pass Screen -->
+<div id="game-over-screen" class="menu-overlay hidden">
+    <h1 id="result-title">MISSION COMPLETE</h1>
+    <h2 id="final-score">Score: 0</h2>
+    <h3 id="multi-pass-msg" style="color: #ff4444; display: none;">PASS THE CROSSBOW!</h3>
+    <button onclick="Game.returnToMenu()">返回主選單</button>
+</div>
+
+<!-- HUD -->
+<div id="ui-layer" class="hidden">
+    <div id="top-bar" class="hud-panel">
+        <div class="score-box">SCORE: <span id="score-val">0</span></div>
+        <div id="combo-display" class="combo-box">x0 COMBO</div>
+        <div class="timer-box" id="timer-val">00:00</div>
+    </div>
+    
+    <div class="hit-marker" id="hit-marker"></div>
+    <div id="crosshair"></div>
+
+    <div id="bottom-bar" class="hud-panel">
+        <div id="controls-hint">
+            <span class="key">WASD</span> Move | <span class="key">R</span> Reload
+        </div>
+        <div class="ammo-display">
+            <div id="arrow-normal" class="ammo-type ammo-selected">➤ 普通箭 (Normal)</div>
+            <div id="arrow-rapid" class="ammo-type">➵ 速射箭 (Rapid)</div>
+            <div id="arrow-blast" class="ammo-type">💣 爆裂箭 (Blast)</div>
+            <div style="margin-top: 5px;">AMMO: <span id="ammo-count">∞</span></div>
+        </div>
+    </div>
+</div>
+
+<script>
+/**
+ * 聲音合成器 (Web Audio API)
+ * 無需外部檔案，直接生成音效
+ */
+const AudioSynth = {
+    ctx: new (window.AudioContext || window.webkitAudioContext)(),
+    
+    playTone: function(freq, type, duration, vol = 0.1) {
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+        gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + duration);
+    },
+
+    playShoot: function() {
+        // 十字弓發射聲：短促的弦聲
+        this.playTone(600, 'sawtooth', 0.1, 0.2);
+        this.playTone(100, 'square', 0.15, 0.3); // Thud
+    },
+    
+    playReload: function() {
+        this.playTone(300, 'triangle', 0.1, 0.1);
+        setTimeout(() => this.playTone(400, 'triangle', 0.1, 0.1), 150);
+    },
+
+    playHitWood: function() {
+        this.playTone(200, 'square', 0.1, 0.2);
+    },
+
+    playHitBullseye: function() {
+        this.playTone(880, 'sine', 0.3, 0.3); // High pitch ding
+        this.playTone(1760, 'sine', 0.3, 0.1);
+    },
+
+    playExplosion: function() {
+        // Noise buffer for explosion
+        const bufferSize = this.ctx.sampleRate * 0.5;
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1;
+        }
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = buffer;
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0.5, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.5);
+        noise.connect(gain);
+        gain.connect(this.ctx.destination);
+        noise.start();
+    },
+
+    playCombo: function(count) {
+        const baseFreq = 440;
+        this.playTone(baseFreq + (count * 50), 'triangle', 0.2, 0.2);
+    }
+};
+
+/**
+ * 遊戲主邏輯
+ */
+const Game = {
+    scene: null, camera: null, renderer: null,
+    mode: null,
+    isPlaying: false,
+    clock: new THREE.Clock(),
+    entities: [],
+    arrows: [],
+    targets: [],
+    particles: [],
+    
+    // Player State
+    player: {
+        mesh: null,
+        speed: 10,
+        canJump: false,
+        velocity: new THREE.Vector3(),
+        direction: new THREE.Vector3(),
+        isZoomed: false,
+        ammoIndex: 0,
+        lastShot: 0,
+        reloading: false,
+        ammoTypes: ['normal', 'rapid', 'blast'],
+        score: 0,
+        combo: 0,
+        comboTimer: 0
+    },
+
+    // Environment
+    raycaster: new THREE.Raycaster(),
+    
+    // Multi-pass
+    currentPlayerIndex: 1,
+    maxPlayers: 2,
+
+    init: function() {
+        // Scene Setup
+        this.scene = new THREE.Scene();
+        // Twilight Fog
+        this.scene.fog = new THREE.FogExp2(0x2a1a10, 0.015); 
+        // 設置 Three.js 場景背景為透明，以便顯示 CSS 背景
+        this.scene.background = null;
+
+        // Camera
+        this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        
+        // Renderer
+        // 設置渲染器 alpha 為 true，使背景透明
+        this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.renderer.shadowMap.enabled = true;
+        document.getElementById('game-container').appendChild(this.renderer.domElement);
+
+        // Lights
+        const ambientLight = new THREE.AmbientLight(0x404040, 1.5); // Soft moon
+        this.scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffaa00, 0.8); // Sunset/Twilight sun
+        dirLight.position.set(50, 100, 50);
+        dirLight.castShadow = true;
+        this.scene.add(dirLight);
+        
+        // Event Listeners
+        window.addEventListener('resize', () => this.onWindowResize(), false);
+        document.addEventListener('click', () => {
+            if(this.isPlaying && !document.pointerLockElement) {
+                document.body.requestPointerLock();
+            }
+        });
+        
+        // Input Binding
+        this.bindInput();
+        
+        // Weapon Model (Procedural Crossbow)
+        this.createWeapon();
+
+        // Loop
+        this.animate();
+    },
+
+    createWeapon: function() {
+        const weaponGroup = new THREE.Group();
+        
+        // Stock
+        const stockGeo = new THREE.BoxGeometry(0.15, 0.15, 0.6);
+        const woodMat = new THREE.MeshStandardMaterial({ color: 0x5c4033 });
+        const stock = new THREE.Mesh(stockGeo, woodMat);
+        stock.position.set(0, -0.2, -0.4);
+        weaponGroup.add(stock);
+
+        // Bow limbs
+        const bowGeo = new THREE.CylinderGeometry(0.02, 0.02, 1, 8);
+        const metalMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.8, roughness: 0.2 });
+        const limb = new THREE.Mesh(bowGeo, metalMat);
+        limb.rotation.z = Math.PI / 2;
+        limb.position.set(0, -0.2, -0.6);
+        // Curve the bow slightly (fake it with rotation or multiple parts - simplified here)
+        weaponGroup.add(limb);
+
+        // String
+        // ... simplified visual
+
+        this.camera.add(weaponGroup);
+        this.player.weapon = weaponGroup;
+        
+        // Add camera to scene
+        this.scene.add(this.camera);
+    },
+
+    bindInput: function() {
+        this.keys = {};
+        document.addEventListener('keydown', (e) => {
+            this.keys[e.code] = true;
+            if (e.code === 'KeyR') this.reload();
+            if (e.code === 'Space') this.jump();
+            // E / Q dodge
+            if ((e.code === 'KeyQ' || e.code === 'KeyE') && this.isPlaying) {
+                this.dodge(e.code === 'KeyQ' ? -1 : 1);
+            }
+        });
+        document.addEventListener('keyup', (e) => this.keys[e.code] = false);
+
+        document.addEventListener('mousedown', (e) => {
+            if (!this.isPlaying) return;
+            if (e.button === 0) this.fireArrow(); // Left Click
+            if (e.button === 1) this.cycleAmmo(); // Middle Click
+            if (e.button === 2) { // Right Click
+                this.setZoom(true);
+            }
+        });
+
+        document.addEventListener('mouseup', (e) => {
+            if (e.button === 2) this.setZoom(false);
+        });
+
+        // Mouse Look
+        document.addEventListener('mousemove', (e) => {
+            if (document.pointerLockElement === document.body && this.isPlaying) {
+                const sensitivity = this.player.isZoomed ? 0.001 : 0.002;
+                // Standard FPS controls
+                this.camera.rotation.y -= e.movementX * sensitivity;
+                // Clamp Pitch
+                const pitch = this.camera.rotation.x - e.movementY * sensitivity;
+                this.camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, pitch));
+                
+                // Weapon Sway
+                this.player.weapon.rotation.y = THREE.MathUtils.lerp(this.player.weapon.rotation.y, -e.movementX * 0.005, 0.1);
+                this.player.weapon.rotation.x = THREE.MathUtils.lerp(this.player.weapon.rotation.x, -e.movementY * 0.005, 0.1);
+            }
+        });
+    },
+
+    startMode: function(modeName) {
+        this.mode = modeName;
+        this.isPlaying = true;
+        this.resetGame();
+        
+        document.getElementById('main-menu').classList.add('hidden');
+        document.getElementById('game-over-screen').classList.add('hidden');
+        document.getElementById('ui-layer').classList.remove('hidden');
+        
+        document.body.requestPointerLock();
+        
+        this.buildLevel(modeName);
+        this.startTimer(modeName === 'patrol' ? 120 : 60);
+    },
+
+    resetGame: function() {
+        // Clear entities
+        this.entities.forEach(e => this.scene.remove(e.mesh));
+        this.targets.forEach(t => this.scene.remove(t.mesh));
+        this.arrows.forEach(a => this.scene.remove(a.mesh));
+        this.entities = [];
+        this.targets = [];
+        this.arrows = [];
+        
+        this.player.score = 0;
+        this.player.combo = 0;
+        this.updateUI();
+
+        // Reset Position
+        this.camera.position.set(0, 1.7, 5);
+        this.camera.rotation.set(0, 0, 0);
+    },
+
+    buildLevel: function(mode) {
+        // Common Ground
+        const planeGeo = new THREE.PlaneGeometry(100, 100);
+        const planeMat = new THREE.MeshStandardMaterial({ color: 0x1a2b15, roughness: 1 }); // Dark grass
+        const ground = new THREE.Mesh(planeGeo, planeMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        this.scene.add(ground);
+        this.entities.push({ mesh: ground, type: 'ground' });
+
+        if (mode === 'target') {
+            // Forest Range
+            this.spawnTrees(20, 20);
+            this.spawnRuins();
+            this.levelLogic = this.updateTargetMode;
+        } else if (mode === 'defense') {
+            // Village Center
+            const centerGeo = new THREE.CylinderGeometry(2, 2, 0.5, 16);
+            const centerMesh = new THREE.Mesh(centerGeo, new THREE.MeshStandardMaterial({color: 0x885522}));
+            this.scene.add(centerMesh);
+            this.spawnTrees(40, 30); // Dense forest surround
+            this.camera.position.set(0, 1.7, 0); // Center
+            this.levelLogic = this.updateDefenseMode;
+        } else if (mode === 'patrol') {
+            // Ruins Exploration
+            this.spawnTrees(15, 40);
+            this.spawnRuins();
+            this.levelLogic = this.updatePatrolMode;
+        }
+    },
+
+    spawnTrees: function(count, radius) {
+        for(let i=0; i<count; i++) {
+            const h = 5 + Math.random() * 5;
+            const treeGeo = new THREE.ConeGeometry(1, h, 8);
+            const treeMat = new THREE.MeshStandardMaterial({ color: 0x0f2a0f });
+            const tree = new THREE.Mesh(treeGeo, treeMat);
+            
+            const angle = Math.random() * Math.PI * 2;
+            const r = 10 + Math.random() * radius;
+            tree.position.set(Math.cos(angle)*r, h/2, Math.sin(angle)*r);
+            this.scene.add(tree);
+            this.entities.push({ mesh: tree, type: 'wall' });
+        }
+    },
+
+    spawnRuins: function() {
+        for(let i=0; i<5; i++) {
+            const geo = new THREE.BoxGeometry(2, 4, 2);
+            const mat = new THREE.MeshStandardMaterial({ color: 0x555555 });
+            const ruin = new THREE.Mesh(geo, mat);
+            ruin.position.set(Math.random()*40 - 20, 2, Math.random()*40 - 20);
+            this.scene.add(ruin);
+            this.entities.push({ mesh: ruin, type: 'wall' });
+        }
+    },
+
+    // --- Actions ---
+
+    cycleAmmo: function() {
+        this.player.ammoIndex = (this.player.ammoIndex + 1) % this.player.ammoTypes.length;
+        const types = ['arrow-normal', 'arrow-rapid', 'arrow-blast'];
+        types.forEach(id => document.getElementById(id).classList.remove('ammo-selected'));
+        document.getElementById(types[this.player.ammoIndex]).classList.add('ammo-selected');
+    },
+
+    setZoom: function(zoom) {
+        this.player.isZoomed = zoom;
+        const targetFOV = zoom ? 40 : 75;
+        new TWEEN.Tween(this.camera)
+            .to({ fov: targetFOV }, 200)
+            .easing(TWEEN.Easing.Quadratic.Out)
+            .onUpdate(() => this.camera.updateProjectionMatrix())
+            .start();
+        
+        if(zoom) document.body.classList.add('zoomed');
+        else document.body.classList.remove('zoomed');
+    },
+
+    fireArrow: function() {
+        const now = performance.now();
+        const type = this.player.ammoTypes[this.player.ammoIndex];
+        const cooldown = type === 'rapid' ? 150 : 600;
+
+        if (now - this.player.lastShot < cooldown) return;
+        this.player.lastShot = now;
+
+        AudioSynth.playShoot();
+
+        // Projectile creation
+        const geo = new THREE.CylinderGeometry(0.02, 0.02, 0.8);
+        const mat = new THREE.MeshBasicMaterial({ color: 0xffffee });
+        const arrowMesh = new THREE.Mesh(geo, mat);
+        
+        arrowMesh.position.copy(this.camera.position);
+        // Offset slightly
+        arrowMesh.position.add(new THREE.Vector3(0.2, -0.2, 0).applyQuaternion(this.camera.quaternion));
+        
+        arrowMesh.quaternion.copy(this.camera.quaternion);
+        arrowMesh.rotateX(-Math.PI/2); // Align cylinder with forward vector
+
+        // Physics properties
+        const speed = type === 'rapid' ? 60 : 40;
+        const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+        
+        // Add random spread for defense mode panic firing
+        if (this.mode === 'defense') {
+            dir.x += (Math.random() - 0.5) * 0.01;
+            dir.y += (Math.random() - 0.5) * 0.01;
+        }
+
+        const arrow = {
+            mesh: arrowMesh,
+            velocity: dir.multiplyScalar(speed),
+            gravity: type === 'rapid' ? 5 : 9.8,
+            type: type,
+            life: 3.0
+        };
+
+        this.scene.add(arrowMesh);
+        this.arrows.push(arrow);
+
+        // Multiple shots for rapid (simplified simulation: one object, rapid fire rate)
+        // If blast, add trail particle
+    },
+
+    dodge: function(dir) {
+        // Quick lateral movement
+        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion);
+        right.y = 0; right.normalize();
+        this.camera.position.add(right.multiplyScalar(dir * 2));
+    },
+
+    jump: function() {
+        if (this.player.canJump && this.mode === 'patrol') {
+            this.player.velocity.y = 10;
+            this.player.canJump = false;
+        }
+    },
+
+    reload: function() {
+        AudioSynth.playReload();
+        // Visual feedback
+        this.player.weapon.rotation.z = 0.5;
+        new TWEEN.Tween(this.player.weapon.rotation)
+            .to({ z: 0 }, 500)
+            .easing(TWEEN.Easing.Bounce.Out)
+            .start();
+    },
+
+    // --- Update Loops ---
+
+    animate: function() {
+        requestAnimationFrame(() => this.animate());
+        const dt = this.clock.getDelta();
+        TWEEN.update();
+
+        if (this.isPlaying) {
+            this.updatePlayer(dt);
+            this.updateArrows(dt);
+            this.updateParticles(dt);
+            
+            if (this.levelLogic) this.levelLogic.call(this, dt);
+            
+            // Combo Decay
+            if (this.player.combo > 0) {
+                this.player.comboTimer -= dt;
+                if (this.player.comboTimer <= 0) {
+                    this.resetCombo();
+                }
+            }
+        }
+
+        this.renderer.render(this.scene, this.camera);
+    },
+
+    updatePlayer: function(dt) {
+        // Movement Physics
+        if (this.mode === 'patrol') {
+            // WASD
+            const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+            forward.y = 0; forward.normalize();
+            const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion);
+            right.y = 0; right.normalize();
+
+            const moveDir = new THREE.Vector3();
+            if (this.keys['KeyW']) moveDir.add(forward);
+            if (this.keys['KeyS']) moveDir.sub(forward);
+            if (this.keys['KeyA']) moveDir.sub(right);
+            if (this.keys['KeyD']) moveDir.add(right);
+
+            if (moveDir.length() > 0) moveDir.normalize();
+
+            const speed = this.keys['ShiftLeft'] ? 3 : 8;
+            this.player.velocity.x = moveDir.x * speed;
+            this.player.velocity.z = moveDir.z * speed;
+            
+            // Gravity
+            this.player.velocity.y -= 20 * dt; 
+            
+            // Apply
+            this.camera.position.x += this.player.velocity.x * dt;
+            this.camera.position.y += this.player.velocity.y * dt;
+            this.camera.position.z += this.player.velocity.z * dt;
+
+            // Floor Collision
+            if (this.camera.position.y < 1.7) {
+                this.camera.position.y = 1.7;
+                this.player.velocity.y = 0;
+                this.player.canJump = true;
+            }
+        }
+        
+        // Weapon sway return
+        this.player.weapon.rotation.y = THREE.MathUtils.lerp(this.player.weapon.rotation.y, 0, dt * 5);
+        this.player.weapon.rotation.x = THREE.MathUtils.lerp(this.player.weapon.rotation.x, 0, dt * 5);
+    },
+
+    updateArrows: function(dt) {
+        for (let i = this.arrows.length - 1; i >= 0; i--) {
+            const a = this.arrows[i];
+            
+            // Physics
+            a.velocity.y -= a.gravity * dt;
+            const step = a.velocity.clone().multiplyScalar(dt);
+            const nextPos = a.mesh.position.clone().add(step);
+
+            // Raycast for collision
+            const dir = step.clone().normalize();
+            const dist = step.length();
+            this.raycaster.set(a.mesh.position, dir);
+            
+            // Get collidable meshes (Targets + Ground)
+            const collidables = [...this.targets.map(t => t.mesh), ...this.entities.map(e => e.mesh)];
+            const intersects = this.raycaster.intersectObjects(collidables);
+
+            if (intersects.length > 0 && intersects[0].distance <= dist) {
+                // HIT!
+                this.handleHit(intersects[0], a);
+                this.scene.remove(a.mesh);
+                this.arrows.splice(i, 1);
+            } else {
+                a.mesh.position.add(step);
+                a.mesh.lookAt(a.mesh.position.clone().add(a.velocity));
+                a.mesh.rotateX(-Math.PI/2);
+                
+                a.life -= dt;
+                if (a.life <= 0 || a.mesh.position.y < 0) {
+                    this.scene.remove(a.mesh);
+                    this.arrows.splice(i, 1);
+                }
+            }
+        }
+    },
+
+    handleHit: function(hit, arrow) {
+        // Find target object data
+        const target = this.targets.find(t => t.mesh === hit.object);
+        
+        if (target) {
+            // Logic for bullseye
+            // Calculate distance from center of target (local coords)
+            const localPoint = hit.object.worldToLocal(hit.point.clone());
+            const dist = Math.sqrt(localPoint.x*localPoint.x + localPoint.y*localPoint.y);
+            
+            let points = 10;
+            let isCrit = false;
+
+            if (dist < 0.2) { // Bullseye
+                points = 100;
+                isCrit = true;
+                AudioSynth.playHitBullseye();
+            } else if (dist < 0.5) {
+                points = 50;
+                AudioSynth.playHitWood();
+            } else {
+                AudioSynth.playHitWood();
+            }
+
+            // Explosion logic
+            if (arrow.type === 'blast') {
+                this.spawnExplosion(hit.point);
+                points *= 1.5; // Blast bonus
+            }
+
+            this.addScore(points, hit.point, isCrit);
+            
+            // Remove target if shot
+            this.removeTarget(target);
+
+        } else {
+            // Hit ground/wall
+            AudioSynth.playHitWood();
+            if (arrow.type === 'blast') this.spawnExplosion(hit.point);
+            this.resetCombo();
+        }
+        
+        // Hit Marker UI
+        const marker = document.getElementById('hit-marker');
+        marker.style.opacity = 1;
+        marker.style.transform = 'translate(-50%, -50%) scale(1.2) rotate(45deg)';
+        setTimeout(() => {
+            marker.style.opacity = 0;
+            marker.style.transform = 'translate(-50%, -50%) scale(1) rotate(45deg)';
+        }, 100);
+    },
+
+    spawnExplosion: function(pos) {
+        AudioSynth.playExplosion();
+        // Create simple particle explosion
+        for(let i=0; i<10; i++) {
+            const geo = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+            const mat = new THREE.MeshBasicMaterial({ color: 0xffaa00 });
+            const p = new THREE.Mesh(geo, mat);
+            p.position.copy(pos);
+            p.position.x += (Math.random()-0.5);
+            p.position.y += (Math.random()-0.5);
+            
+            this.scene.add(p);
+            this.particles.push({
+                mesh: p,
+                vel: new THREE.Vector3((Math.random()-0.5)*5, (Math.random())*5, (Math.random()-0.5)*5),
+                life: 0.5
+            });
+        }
+        
+        // Screen Shake
+        const initialY = this.camera.position.y;
+        new TWEEN.Tween(this.camera.position)
+            .to({ y: initialY - 0.2 }, 50)
+            .yoyo(true).repeat(3).start();
+    },
+
+    updateParticles: function(dt) {
+        for(let i=this.particles.length-1; i>=0; i--) {
+            const p = this.particles[i];
+            p.mesh.position.add(p.vel.clone().multiplyScalar(dt));
+            p.mesh.scale.multiplyScalar(0.9);
+            p.life -= dt;
+            if(p.life <= 0) {
+                this.scene.remove(p.mesh);
+                this.particles.splice(i, 1);
+            }
+        }
+    },
+
+    // --- Game Mode Specific Logic ---
+
+    // 1. Target Mode
+    targetSpawnTimer: 0,
+    updateTargetMode: function(dt) {
+        this.targetSpawnTimer -= dt;
+        if (this.targetSpawnTimer <= 0) {
+            this.spawnTarget();
+            this.targetSpawnTimer = Math.max(1.0, 3.0 - (this.player.score / 500)); // Gets faster
+        }
+        
+        // Move targets (Mid/Hard difficulty behavior)
+        this.targets.forEach(t => {
+            if (t.moving) {
+                t.mesh.position.x += Math.sin(Date.now() * 0.002) * 0.05;
+            }
+        });
+    },
+
+    spawnTarget: function() {
+        const geo = new THREE.CylinderGeometry(1, 1, 0.1, 32);
+        geo.rotateX(Math.PI/2); // Face player
+        
+        // Create canvas texture for rings
+        const canvas = document.createElement('canvas');
+        canvas.width = 128; canvas.height = 128;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#dcb'; ctx.fillRect(0,0,128,128); // Wood
+        ctx.beginPath(); ctx.arc(64,64, 50, 0, Math.PI*2); ctx.fillStyle='white'; ctx.fill();
+        ctx.beginPath(); ctx.arc(64,64, 30, 0, Math.PI*2); ctx.fillStyle='red'; ctx.fill();
+        ctx.beginPath(); ctx.arc(64,64, 15, 0, Math.PI*2); ctx.fillStyle='red'; ctx.fill(); // Bullseye center
+        
+        const tex = new THREE.CanvasTexture(canvas);
+        const mat = new THREE.MeshStandardMaterial({ map: tex });
+        
+        const mesh = new THREE.Mesh(geo, mat);
+        
+        // Random pos in front
+        mesh.position.set(
+            (Math.random()-0.5) * 30,
+            2 + Math.random() * 5,
+            -10 - Math.random() * 20
+        );
+        mesh.lookAt(this.camera.position); // Always face player slightly
+        
+        this.scene.add(mesh);
+        this.targets.push({ mesh: mesh, moving: Math.random() > 0.5 });
+    },
+
+    removeTarget: function(target) {
+        // Splinter effect
+        this.spawnExplosion(target.mesh.position);
+        this.scene.remove(target.mesh);
+        this.targets = this.targets.filter(t => t !== target);
+    },
+
+    // 2. Defense Mode
+    defenseWaveTimer: 0,
+    updateDefenseMode: function(dt) {
+        this.defenseWaveTimer -= dt;
+        // Limit movement (Turret mode)
+        this.camera.position.set(0, 1.7, 0); 
+        
+        if (this.defenseWaveTimer <= 0) {
+            this.spawnEnemy();
+            this.defenseWaveTimer = 2.0;
+        }
+
+        // Move enemies toward center
+        this.targets.forEach(e => {
+            const dir = new THREE.Vector3().subVectors(new THREE.Vector3(0,0,0), e.mesh.position).normalize();
+            e.mesh.position.add(dir.multiplyScalar(3 * dt)); // Speed
+            e.mesh.lookAt(new THREE.Vector3(0,0,0));
+            
+            if (e.mesh.position.length() < 2) {
+                // Game Over condition or damage
+                this.removeTarget(e);
+                this.screenFlash(); // Damage feedback
+                this.player.combo = 0; // Break combo
+                this.updateUI();
+            }
+        });
+    },
+
+    spawnEnemy: function() {
+        // Shadow Beasts (Cubes for now)
+        const geo = new THREE.BoxGeometry(1, 2, 1);
+        const mat = new THREE.MeshStandardMaterial({ color: 0x111111, emissive: 0x330033 });
+        const mesh = new THREE.Mesh(geo, mat);
+        
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 30;
+        mesh.position.set(Math.cos(angle)*dist, 1, Math.sin(angle)*dist);
+        
+        this.scene.add(mesh);
+        this.targets.push({ mesh: mesh, type: 'enemy' });
+    },
+
+    // 3. Patrol Mode
+    updatePatrolMode: function(dt) {
+        // Just ambient spawns
+        if (this.targets.length < 5 && Math.random() < 0.02) {
+            this.spawnTarget(); // Reuse target logic but place them in the world
+        }
+    },
+
+    // --- UI & Scoring ---
+
+    addScore: function(basePoints, pos, isCrit) {
+        this.player.combo++;
+        this.player.comboTimer = 3.0;
+        
+        const multiplier = Math.min(1 + Math.floor(this.player.combo / 5), 4);
+        const finalScore = basePoints * multiplier;
+        this.player.score += finalScore;
+        
+        // Show floating text
+        this.createFloatingText(`+${finalScore}`, pos, isCrit);
+        
+        this.updateUI();
+        AudioSynth.playCombo(Math.min(this.player.combo, 10));
+    },
+
+    resetCombo: function() {
+        if (this.player.combo > 5) {
+            // Glass breaking sound?
+        }
+        this.player.combo = 0;
+        this.updateUI();
+    },
+
+    createFloatingText: function(text, pos3D, isCrit) {
+        const div = document.createElement('div');
+        div.className = 'floating-text';
+        div.textContent = text;
+        div.style.color = isCrit ? '#ff4444' : '#ffffff';
+        div.style.fontSize = isCrit ? '30px' : '20px';
+        
+        // Project 3D pos to 2D screen
+        const vec = pos3D.clone().project(this.camera);
+        const x = (vec.x * .5 + .5) * window.innerWidth;
+        const y = (-(vec.y * .5) + .5) * window.innerHeight;
+        
+        div.style.left = `${x}px`;
+        div.style.top = `${y}px`;
+        
+        document.getElementById('ui-layer').appendChild(div);
+        setTimeout(() => div.remove(), 1000);
+    },
+
+    updateUI: function() {
+        document.getElementById('score-val').textContent = Math.floor(this.player.score);
+        
+        const comboEl = document.getElementById('combo-display');
+        if (this.player.combo > 1) {
+            comboEl.textContent = `x${this.player.combo} COMBO`;
+            comboEl.classList.add('combo-active');
+        } else {
+            comboEl.classList.remove('combo-active');
+            comboEl.style.opacity = 0;
+        }
+    },
+    
+    screenFlash: function() {
+        const f = document.getElementById('flash');
+        f.style.opacity = 0.8;
+        setTimeout(() => f.style.opacity = 0, 100);
+    },
+
+    // --- System ---
+
+    startTimer: function(seconds) {
+        let t = seconds;
+        const el = document.getElementById('timer-val');
+        
+        if (this.timerInt) clearInterval(this.timerInt);
+        
+        this.timerInt = setInterval(() => {
+            if (!this.isPlaying) return;
+            t--;
+            const min = Math.floor(t/60).toString().padStart(2, '0');
+            const sec = (t%60).toString().padStart(2, '0');
+            el.textContent = `${min}:${sec}`;
+            
+            if (t <= 0) {
+                this.endGame();
+            }
+        }, 1000);
+    },
+
+    endGame: function() {
+        this.isPlaying = false;
+        clearInterval(this.timerInt);
+        document.exitPointerLock();
+        
+        const gameOverScreen = document.getElementById('game-over-screen');
+        const scoreDisplay = document.getElementById('final-score');
+        const passMsg = document.getElementById('multi-pass-msg');
+        
+        scoreDisplay.textContent = `Final Score: ${Math.floor(this.player.score)}`;
+        gameOverScreen.classList.remove('hidden');
+        document.getElementById('ui-layer').classList.add('hidden');
+
+        // Multiplayer Logic
+        if (this.currentPlayerIndex < this.maxPlayers) {
+            document.getElementById('result-title').textContent = "PLAYER " + this.currentPlayerIndex + " FINISHED";
+            passMsg.style.display = 'block';
+            this.currentPlayerIndex++;
+            // Setup button to start next round immediately? 
+            // Simplified: Just shows Return to Menu, but text implies passing
+        } else {
+            document.getElementById('result-title').textContent = "ALL TRIALS COMPLETE";
+            passMsg.style.display = 'none';
+            this.currentPlayerIndex = 1;
+        }
+    },
+
+    returnToMenu: function() {
+        document.getElementById('game-over-screen').classList.add('hidden');
+        document.getElementById('main-menu').classList.remove('hidden');
+        // Reset camera background blur etc if any
+    },
+
+    onWindowResize: function() {
+        this.camera.aspect = window.innerWidth / window.innerHeight;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+};
+
+// Start
+window.onload = () => Game.init();
+
+</script>
+</body>
+</html>

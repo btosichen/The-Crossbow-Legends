@@ -257,8 +257,8 @@
     <div style="margin-top: 40px; display: grid; grid-template-columns: 1fr 1fr; gap: 30px; text-align: left; border-top: 1px solid #555; padding-top: 20px;">
         <div>
             <p><span class="key">LMB</span> 射擊</p>
-            <p><span class="key">RMB</span> 精準瞄準 (長按)</p>
-            <p><span class="key">MMB</span> 切換箭矢</p>
+            <p><span class="key">Shift</span> 精準瞄準 (長按)</p>
+            <p><span class="key">F</span> 切換箭矢</p>
         </div>
         <div>
             <p><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> 移動</p>
@@ -289,7 +289,7 @@
 
     <div id="bottom-bar" class="hud-panel">
         <div id="controls-hint">
-            <span class="key">WASD</span> Move | <span class="key">R</span> Reload
+            <span class="key">WASD</span> Move | <span class="key">R</span> Reload | <span class="key">F</span> Switch Ammo
         </div>
         <div class="ammo-display">
             <div id="arrow-normal" class="ammo-type ammo-selected">➤ 普通箭 (Normal)</div>
@@ -466,21 +466,23 @@ const Game = {
             this.keys[e.code] = true;
             if (e.code === 'KeyR') this.reload();
             if (e.code === 'Space') this.jump();
+            if (e.code === 'KeyF') this.cycleAmmo(); // MMB -> F
+            if (e.code === 'ShiftLeft') this.setZoom(true); // RMB -> Shift (Press)
+            
             if ((e.code === 'KeyQ' || e.code === 'KeyE') && this.isPlaying) {
                 this.dodge(e.code === 'KeyQ' ? -1 : 1);
             }
         });
-        document.addEventListener('keyup', (e) => this.keys[e.code] = false);
+        
+        document.addEventListener('keyup', (e) => {
+            this.keys[e.code] = false;
+            if (e.code === 'ShiftLeft') this.setZoom(false); // RMB -> Shift (Release)
+        });
 
         document.addEventListener('mousedown', (e) => {
             if (!this.isPlaying) return;
             if (e.button === 0) this.fireArrow();
-            if (e.button === 1) this.cycleAmmo();
-            if (e.button === 2) this.setZoom(true);
-        });
-
-        document.addEventListener('mouseup', (e) => {
-            if (e.button === 2) this.setZoom(false);
+            // Removed MMB and RMB click handlers
         });
 
         document.addEventListener('mousemove', (e) => {
